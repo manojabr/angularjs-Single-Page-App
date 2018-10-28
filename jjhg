@@ -1,0 +1,208 @@
+import java.io.*;
+import java.nio.file.*;
+import java.util.*;
+import javax.mail.*;
+import javax.mail.internet.*;
+
+import org.apache.poi.ss.usermodel.CellType;
+import org.apache.poi.ss.usermodel.DataFormat;
+import org.apache.poi.ss.usermodel.DataFormatter;
+import org.apache.poi.xssf.usermodel.*;
+
+public class consolidator {
+
+	private Address[] fromAddress, toAddress;
+	private Session session;
+	private String content = null;
+	private final static int summaryPageIndex = 0;
+
+	public static void main(String[] args) throws Exception {
+		consolidator consolidate = new consolidator();
+		consolidate.setUp().consolidateToMailfile();
+
+	}
+
+	private consolidator setUp() throws AddressException {
+		String outDirName = "target/output";
+		Properties properties = new Properties();
+		properties.put("mail.files.path", outDirName);
+		session = Session.getDefaultInstance(properties);
+
+		fromAddress = new Address[] { new InternetAddress("abc@test.com") };
+		toAddress = new Address[] { new InternetAddress("bca@test.com") };
+		return this;
+	}
+
+	public String getConsolidatedContent() throws Exception {
+		String mainContent = null;
+		String header = getContentFrmFile("header");
+		String footer = getContentFrmFile("footer");
+		content = getContentFromExcel("dumms.xlsx");
+		content += getContentFromExcel("AMS productivity.xlsx");
+		content += getContentFromExcel("AP productivity.xlsx");
+		content += getContentFromExcel("BA productivity.xlsx");
+		content += getContentFromExcel("Config productivity.xlsx");
+		content += getContentFromExcel("Integ productivity.xlsx");
+		content += getContentFromExcel("PERS productivity.xlsx");
+		content += getContentFromExcel("QA productivity.xlsx");
+
+		mainContent = header + content + footer;
+		return mainContent;
+	}
+
+	private String getContentFromExcel(String Filename) throws FileNotFoundException, IOException {
+		FileInputStream fis = new FileInputStream(new File(Filename));
+		XSSFWorkbook wb = new XSSFWorkbook(fis);
+		System.out.println(wb.getSheetAt(summaryPageIndex).getLastRowNum());
+		System.out.println(wb.getSheetAt(summaryPageIndex).getRow(0).getLastCellNum());
+		String leave_content = "<table class=\"MsoNormalTable\" border=\"0\" cellspacing=\"0\" cellpadding=\"0\" width=\"975\" style=\"width:731.05pt;margin-left:-.15pt;border-collapse:collapse;mso-yfti-tbllook:\r\n"
+				+ " 1184;mso-padding-alt:0in 0in 0in 0in\"><tbody>";
+
+		for (int i = 0; i <= wb.getSheetAt(summaryPageIndex).getLastRowNum(); i++) {
+			leave_content += "<tr style=\"mso-yfti-irow:" + i + ";"
+					+ ((i == 0) ? "mso-yfti-firstrow:yes;" : ((i == 0) ? "mso-yfti-lastrow:yes;" : ""))
+					+ " ;height:15.0pt\">";
+			leave_content += getEachRowContent(wb, i);
+			leave_content += "</tr>";
+
+		}
+		leave_content += "</tbody></table>";
+		leave_content += "<p class=MsoNormal>\r\n" + "	<o:p>&nbsp;</o:p>\r\n" + "		</p>\r\n" + "\r\n"
+				+ "		<p class=MsoNormal>\r\n" + "	<o:p>&nbsp;</o:p>\r\n" + "		</p>\r\n" + "\r\n"
+				+ "		<p class=MsoNormal>\r\n" + "	<o:p>&nbsp;</o:p>\r\n" + "		</p>";
+
+		return leave_content;
+	}
+
+	private String getContentFrmFile(String Filename) throws Exception {
+		return new String(Files.readAllBytes(Paths.get(Filename)));
+	}
+
+	private static String getEachRowContent(XSSFWorkbook wb, int i) {
+		String content = "";
+		for (int j = 0; j < wb.getSheetAt(summaryPageIndex).getRow(i).getLastCellNum(); j++) {
+
+			if (j == 0 && i == 0) {
+				content += "<td width=\"90\" nowrap=\"\" " // + " colspan=\""
+						// + wb.getSheetAt(summaryPageIndex).getRow(i).getLastCellNum() + "\" "
+						+ "  valign=\"bottom\" style=\"width:200.05pt;\r\n"
+						+ "  border:solid windowtext 1.0pt;background:#C6E0B4;padding:0in 5.4pt 0in 5.4pt;"
+						+ "  height:15.0pt\">"
+						+ "    <p class=\"MsoNormal\" align=\"center\" style=\"text-align:center\">\r\n" + " <b>\r\n"
+						+ " <span style=\"font-size:9.5pt;color:black\">";
+				if (wb.getSheetAt(summaryPageIndex).getRow(i).getCell(j).getCellType() == CellType.STRING
+						|| wb.getSheetAt(summaryPageIndex).getRow(i).getCell(j).getCellType() == CellType.BLANK) {
+					content += wb.getSheetAt(summaryPageIndex).getRow(i).getCell(j).getStringCellValue();
+				} else {
+					content += wb.getSheetAt(summaryPageIndex).getRow(i).getCell(j).getRawValue();
+				}
+
+			} else if (i == 1) {
+				content += " <td width=\""
+						+ ((new DataFormatter()
+								.formatCellValue(wb.getSheetAt(summaryPageIndex).getRow(i).getCell(j)) == "comments")
+										? "120"
+										: "77")
+						+ "\" nowrap=\"\" valign=\"bottom\" style=\"width:74.05pt;border:solid windowtext 1.0pt;\r\n"
+						+ "background:#A9D08E;padding:0in 5.4pt 0in 5.4pt;height:15.0pt\">\r\n"
+						+ "  <p class=\"MsoNormal\">\r\n" + " <b> \r\n"
+						+ "   <span style=\"font-size:9.5pt;color:black\">";
+				if (wb.getSheetAt(summaryPageIndex).getRow(i).getCell(j).getCellType() == CellType.NUMERIC) {
+					content += wb.getSheetAt(summaryPageIndex).getRow(i).getCell(j).getRawValue();
+				} else {
+					content += wb.getSheetAt(summaryPageIndex).getRow(i).getCell(j).getStringCellValue();
+				}
+			} else if (j == 0 && i == wb.getSheetAt(summaryPageIndex).getLastRowNum()) {
+				if (wb.getSheetAt(summaryPageIndex).getRow(i).getCell(j).getCellType() == CellType.STRING
+						|| wb.getSheetAt(summaryPageIndex).getRow(i).getCell(j).getCellType() == CellType.BLANK) {
+					content += "<td width=\""
+							+ ((new DataFormatter()
+									.formatCellValue(wb.getSheetAt(summaryPageIndex).getRow(i).getCell(j))
+									.toLowerCase() == "comments") ? "120" : "77")
+							+ "\" nowrap=\"\" valign=\"top\" style=\"width:58.05pt;border:solid windowtext 1.0pt;\r\n"
+							+ "background:#E2EFDA;padding:0in 5.4pt 0in 5.4pt;height:15.0pt\">\r\n"
+							+ "<p class=\"MsoNormal\">\r\n" + "<b>\r\n"
+							+ "  <span style=\"font-size:9.5pt;color:black\">";
+					content += wb.getSheetAt(summaryPageIndex).getRow(i).getCell(j).getStringCellValue();
+				} else {
+					content += "<td width=\""
+							+ ((new DataFormatter()
+									.formatCellValue(wb.getSheetAt(summaryPageIndex).getRow(i).getCell(j))
+									.toLowerCase() == "comments") ? "120" : "77")
+							+ "\" nowrap=\"\" valign=\"top\" style=\"width:65.0pt;"
+							+ "border-bottom:solid windowtext 1.0pt;" + "border:solid windowtext 1.0pt;\r\n"
+							+ "  padding:0in 5.4pt 0in 5.4pt;height:15.0pt\">\r\n" + " <p class=\"MsoNormal\">\r\n"
+							+ " <span style=\"font-size:9.5pt;color:black\">";
+					content += wb.getSheetAt(summaryPageIndex).getRow(i).getCell(j).getRawValue();
+				}
+
+			} else if (i == wb.getSheetAt(summaryPageIndex).getLastRowNum()) {
+				if (wb.getSheetAt(summaryPageIndex).getRow(i).getCell(j).getCellType() == CellType.STRING
+						|| wb.getSheetAt(summaryPageIndex).getRow(i).getCell(j).getCellType() == CellType.BLANK) {
+					content += "<td width=\""
+							+ ((new DataFormatter()
+									.formatCellValue(wb.getSheetAt(summaryPageIndex).getRow(i).getCell(j))
+									.toLowerCase() == "comments") ? "120" : "77")
+							+ "\" nowrap=\"\" valign=\"top\" style=\"width:58.05pt;border:solid windowtext 1.0pt;\r\n"
+							+ "background:#92D050;padding:0in 5.4pt 0in 5.4pt;height:15.0pt\">\r\n"
+							+ "          <p class=\"MsoNormal\">\r\n" + "            <b>\r\n"
+							+ "              <span style=\"font-size:9.5pt;color:black\">";
+					content += wb.getSheetAt(summaryPageIndex).getRow(i).getCell(j).getStringCellValue();
+				} else {
+					content += "<td width=\""
+							+ ((new DataFormatter()
+									.formatCellValue(wb.getSheetAt(summaryPageIndex).getRow(i).getCell(j))
+									.toLowerCase() == "comments") ? "120" : "77")
+							+ "\" nowrap=\"\" valign=\"top\" style=\"width:58.05pt;border:solid windowtext 1.0pt;\r\n"
+							+ ";background:#92D050;padding:0in 5.4pt 0in 5.4pt;height:15.0pt\">\r\n"
+							+ "          <p class=\"MsoNormal\">\r\n" + "            <b>\r\n"
+							+ "              <span style=\"font-size:9.5pt;color:black\">";
+					content += wb.getSheetAt(summaryPageIndex).getRow(i).getCell(j).getRawValue();
+				}
+
+			} else {
+				content += "<td width=\""
+						+ ((new DataFormatter().formatCellValue(wb.getSheetAt(summaryPageIndex).getRow(i).getCell(j))
+								.toLowerCase() == "comments") ? "120" : "87")
+						+ "\" nowrap=\"\" valign=\"top\" style=\"width:65.0pt;"
+						+ "border:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;\r\n"
+						+ "  padding:0in 5.4pt 0in 5.4pt;height:15.0pt\">\r\n" + " <p class=\"MsoNormal\">\r\n"
+						+ " <span style=\"font-size:9.5pt;color:black\">";
+				if (wb.getSheetAt(summaryPageIndex).getRow(i).getCell(j).getCellType() == CellType.STRING
+						|| wb.getSheetAt(summaryPageIndex).getRow(i).getCell(j).getCellType() == CellType.BLANK) {
+					content += wb.getSheetAt(summaryPageIndex).getRow(i).getCell(j).getStringCellValue();
+				} else {
+					content += wb.getSheetAt(summaryPageIndex).getRow(i).getCell(j).getRawValue();
+				}
+			}
+
+		}
+		content += " <o:p></o:p>\r\n" + "</span> " + " </b>" + " </p>" + " </td>";
+
+		return content;
+	}
+
+	public void consolidateToMailfile() throws Exception, MessagingException {
+		try (OutputStream out = new FileOutputStream("consolidate.eml")) {
+			generateMessage().writeTo(out);
+		}
+	}
+
+	private MimeMessage generateMessage() throws Exception {
+		MimeMessage msg = new MimeMessage(session);
+		msg.addFrom(fromAddress);
+		msg.setReplyTo(toAddress);
+		msg.setSubject("subject");
+		MimeBodyPart textPart = new MimeBodyPart();
+		textPart.setText("Body's text (text)", "UTF-8");
+		MimeBodyPart htmlPart = new MimeBodyPart();
+		htmlPart.setContent(getConsolidatedContent(), "text/html; charset=UTF-8");
+		Multipart multiPart = new MimeMultipart("alternative");
+		multiPart.addBodyPart(textPart); // first
+		multiPart.addBodyPart(htmlPart); // second
+		msg.setContent(multiPart);
+		msg.addHeader("X-Custom-Header", "CustomValue");
+		return msg;
+	}
+
+}
