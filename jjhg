@@ -38,13 +38,7 @@ public class consolidator {
 		String header = getContentFrmFile("header");
 		String footer = getContentFrmFile("footer");
 		content = getContentFromExcel("dumms.xlsx");
-		content += getContentFromExcel("AMS productivity.xlsx");
-		content += getContentFromExcel("AP productivity.xlsx");
-		content += getContentFromExcel("BA productivity.xlsx");
-		content += getContentFromExcel("Config productivity.xlsx");
-		content += getContentFromExcel("Integ productivity.xlsx");
-		content += getContentFromExcel("PERS productivity.xlsx");
-		content += getContentFromExcel("QA productivity.xlsx");
+		
 
 		mainContent = header + content + footer;
 		return mainContent;
