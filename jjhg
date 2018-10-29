@@ -350,6 +350,74 @@ div.WordSection1 {
 		
 		
 		
+	---------------------------------------------------------------------------------------------------------------------------	
+		
+		
+		
+		
+		
+			private String getContentFromExcel(String Filename) throws FileNotFoundException, IOException {
+		FileInputStream fis = new FileInputStream(new File(Filename));
+		XSSFWorkbook wb = new XSSFWorkbook(fis);
+		System.out.println(wb.getSheetAt(summaryPageIndex).getLastRowNum());
+		System.out.println(wb.getSheetAt(summaryPageIndex).getRow(0).getLastCellNum());
+
+		String[][] MergeMap = getContentArray(wb);
+
+		String leave_content = "<table class=\"MsoNormalTable\" border=\"0\" cellspacing=\"0\" cellpadding=\"0\" width=\"975\" style=\"width:731.05pt;margin-left:-.15pt;border-collapse:collapse;mso-yfti-tbllook:\r\n"
+				+ " 1184;mso-padding-alt:0in 0in 0in 0in\"><tbody>";
+		for (int i = 0; i <= wb.getSheetAt(summaryPageIndex).getLastRowNum(); i++) {
+			leave_content += "<tr style=\"mso-yfti-irow:" + i + ";"
+					+ ((i == 0) ? "mso-yfti-firstrow:yes;" : ((i == 0) ? "mso-yfti-lastrow:yes;" : ""))
+					+ " ;height:15.0pt\">";
+			leave_content += getEachRowContent(wb, i);
+			leave_content += "</tr>";
+
+		}
+		leave_content += "</tbody></table>";
+		leave_content += "<p class=MsoNormal>\r\n" + "	<o:p>&nbsp;</o:p>\r\n" + "		</p>\r\n" + "\r\n"
+				+ "		<p class=MsoNormal>\r\n" + "	<o:p>&nbsp;</o:p>\r\n" + "		</p>\r\n" + "\r\n"
+				+ "		<p class=MsoNormal>\r\n" + "	<o:p>&nbsp;</o:p>\r\n" + "		</p>";
+
+		return leave_content;
+	}
+
+	String root = null;
+
+	private String[][] getContentArray(XSSFWorkbook wb) {
+		// TODO Auto-generated method stub
+		String[][] arr = new String[wb.getSheetAt(summaryPageIndex).getLastRowNum()][wb.getSheetAt(summaryPageIndex)
+				.getRow(0).getLastCellNum()];
+		System.out.println(arr.length + " " + arr[0].length);
+		for (int i = 0; i < arr.length; i++) {
+			for (int j = 0; j < arr[i].length; j++) {
+				root = "";
+				if (getMergedRegionForCell(wb.getSheetAt(summaryPageIndex).getRow(i).getCell(j)) != null) {
+					root = "" + getMergedRegionForCell(wb.getSheetAt(summaryPageIndex).getRow(i).getCell(j));
+					System.out
+							.println(i + " " + j + " " + root.substring(root.indexOf("[") + 1, root.indexOf("[") + 3));
+				}
+
+				if (wb.getSheetAt(summaryPageIndex).getRow(i).getCell(j).getCellType() == CellType.STRING
+						|| wb.getSheetAt(summaryPageIndex).getRow(i).getCell(j).getCellType() == CellType.BLANK) {
+					arr[i][j] = ((root.equals("") || root.equals(null)) ? ""
+							: root.substring(root.indexOf("[") + 1, root.indexOf("[") + 3)+ "--") 
+							+ wb.getSheetAt(summaryPageIndex).getRow(i).getCell(j).getStringCellValue();
+					System.out.println(i + " " + j + " " + "added :" + arr[i][j]);
+				} else {
+					arr[i][j] = ((root.equals("") || root.equals(null)) ? ""
+							: root.substring(root.indexOf("[") + 1, root.indexOf("[") + 3)+ "--")
+							+ wb.getSheetAt(summaryPageIndex).getRow(i).getCell(j).getRawValue() + "";
+					System.out.println(i + " " + j + " " + "added :" + arr[i][j]);
+				}
+			}
+		}
+		return arr;
+	}
+		
+		
+		
+		
 		
 		
 		
