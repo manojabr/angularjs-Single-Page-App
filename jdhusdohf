@@ -1,0 +1,425 @@
+import java.awt.Desktop;
+import java.io.*;
+import java.nio.file.*;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
+import java.util.*;
+import javax.mail.*;
+import javax.mail.internet.*;
+
+import org.apache.poi.ss.usermodel.CellType;
+import org.apache.poi.ss.util.CellRangeAddress;
+import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.xssf.usermodel.*;
+
+public class consolidator {
+	static String[] alphabet = { "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q",
+			"R", "S", "T", "U", "V", "W", "X", "Y", "Z" };
+	private Address[] fromAddress, toAddress;
+	private Session session;
+	private String content = null;
+	private static int summaryPageIndex = 0;
+
+	public static void main(String[] args) throws Exception {
+		consolidator consolidate = new consolidator();
+		consolidate.setUp().consolidateToMailfile();
+		consolidate.close();
+	}
+
+	private void close() throws Exception {
+		// TODO Auto-generated method stub
+		Thread.sleep(2000);
+		Runtime.getRuntime().exec("cmd /c taskkill /f /im excel.exe"); 
+	}
+
+	private String[] files = { "QA productivity.xlsx", "Roll Out Leave Tracker.xlsx" };
+
+//	private static String[] files = null;
+
+	private consolidator setUp() throws Exception {
+		String outDirName = "";
+		Properties properties = new Properties();
+		properties.put("mail.files.path", outDirName);
+		session = Session.getDefaultInstance(properties);
+
+		fromAddress = new Address[] { new InternetAddress("abc@test.com") };
+		toAddress = new Address[] { new InternetAddress("vaidyanath.prabhakar@capgemini.com") };
+		// files = downloadFiles.getFilesPath();
+		return this;
+	}
+
+	public String getConsolidatedContent() throws Exception {
+		String mainContent = null;
+		String header = getContentFrmFile("head");
+		String footer = getContentFrmFile("footer");
+		content = openAllExcel().createLeaveTable();
+		content += getContentFromExcel("QA productivity.xlsx", 0, 1);
+		content += getContentFromExcel("Integ productivity.xlsx", 0, 1);
+		content += getContentFromExcel("BA Productivity.xlsx", 0, 1);
+		mainContent = header + content + footer;
+		return mainContent;
+	}
+
+	private String createLeaveTable() throws IOException, Exception {
+
+		Thread.sleep(5000);
+		getListFrmLeaveTracker();
+		List<String> unplndlvNames = getPlannedLeavesNameList();
+		List<String> plndlvNames = getUnplannedLeavesNameList();
+		List<String> wfhNames = getWFHNameList();
+
+		String content = "";
+		content += "<table class=\"MsoNormalTable\" border=\"0\" cellspacing=\"0\" cellpadding=\"0\" width=\"975\" style=\"width:731.05pt;margin-left:-.15pt;border-collapse:collapse;mso-yfti-tbllook:\r\n"
+				+ " 1184;mso-padding-alt:0in 0in 0in 0in\"><tbody>";
+
+		content += "<tr style=\"mso-yfti-irow:0;mso-yfti-firstrow:yes; ;height:15.0pt\">"
+				+ "<td width=\"77\" nowrap colspan=\"4\"  valign=\"bottom\"   style=\"  border:solid windowtext 1.0pt;background:#ffe699;padding:0in 5.4pt 0in 5.4pt;  height:15.0pt\">    <p class=\"MsoNormal\" align=\"left\" style=\"\">"
+				+ "<b><span style=\"font-size:9.5pt;color:000000;\">R2 State Rollout Leave Summary for 16-October <o:p></o:p></span>  </b></p> </td></tr>";
+		content += " <tr style=\"mso-yfti-irow:1; ;height:15.0pt\"><td width=\"77\" nowrap=\"\"   valign=\"bottom\"   style=\"  border:solid windowtext 1.0pt;background:#bdd7ee;padding:0in 5.4pt 0in 5.4pt;  height:15.0pt\">    <p class=\"MsoNormal\" align=\"left\" style=\"\"> <b> "
+				+ "<span style=\"font-size:9.5pt;color:000000;\">Total FTEs <o:p></o:p></span>  </b></p> </td><td width=\"77\" nowrap=\"\"   valign=\"bottom\"   style=\"  border:solid windowtext 1.0pt;background:#bdd7ee;padding:0in 5.4pt 0in 5.4pt;  height:15.0pt\">    "
+				+ "<p class=\"MsoNormal\" align=\"left\" style=\"\"> <b> <span style=\"font-size:9.5pt;color:000000;\">Planned Leaves <o:p></o:p></span>  </b></p> </td><td width=\"77\" nowrap=\"\"   valign=\"bottom\"   style=\"  border:solid windowtext 1.0pt;background:#bdd7ee;padding:0in 5.4pt 0in 5.4pt;  height:15.0pt\">    <p class=\"MsoNormal\" align=\"left\" style=\"\"> <b>"
+				+ " <span style=\"font-size:9.5pt;color:000000;\">Unplanned Leaves <o:p></o:p></span> "
+				+ "</b></p> </td><td width=\"77\" nowrap=\"\"   valign=\"bottom\"   style=\"  border:solid windowtext 1.0pt;background:#bdd7ee;padding:0in 5.4pt 0in 5.4pt;  height:15.0pt\">    <p class=\"MsoNormal\" align=\"left\" style=\"\"> <b> "
+				+ "<span style=\"font-size:9.5pt;color:000000;\">Work from Home <o:p></o:p></span>  </b></p> </td></tr>";
+		content += "<tr style=\"mso-yfti-irow:2; ;height:15.0pt\"><td width=\"77\" nowrap=\"\"   valign=\"bottom\"   style=\"  border:solid windowtext 1.0pt;background:#bdd7ee;padding:0in 5.4pt 0in 5.4pt;  height:15.0pt\">    <p class=\"MsoNormal\" align=\"left\" style=\"\"> <b> <span style=\"font-size:9.5pt;color:000000;\">84 <o:p></o:p></span>  </b></p> "
+				+ "</td><td width=\"77\" nowrap=\"\"   valign=\"bottom\"   style=\"  border:solid windowtext 1.0pt;background:#bdd7ee;padding:0in 5.4pt 0in 5.4pt;  height:15.0pt\">    <p class=\"MsoNormal\" align=\"left\" style=\"\"> <b> <span style=\"font-size:9.5pt;color:000000;\"> "
+				+ ((plndlvNames != null) ? plndlvNames.size() : "0") + " <o:p></o:p></span>  "
+				+ "</b></p> </td><td width=\"77\" nowrap=\"\"   valign=\"bottom\"   style=\"  border:solid windowtext 1.0pt;background:#bdd7ee;padding:0in 5.4pt 0in 5.4pt;  height:15.0pt\">    <p class=\"MsoNormal\" align=\"left\" style=\"\"> <b> <span style=\"font-size:9.5pt;color:000000;\"> "
+				+ ((unplndlvNames != null) ? unplndlvNames.size() : "0") + " <o:p></o:p></span>  </b></p> "
+				+ "</td><td width=\"77\" nowrap=\"\"   valign=\"bottom\"   style=\"  border:solid windowtext 1.0pt;background:#bdd7ee;padding:0in 5.4pt 0in 5.4pt;  height:15.0pt\">    <p class=\"MsoNormal\" align=\"left\" style=\"\"> <b> <span style=\"font-size:9.5pt;color:000000;\"> "
+				+ ((wfhNames != null) ? wfhNames.size() : "0") + " <o:p></o:p></span>  </b></p> </td></tr>";
+
+		content += "<tr style=\"mso-yfti-irow:3; ;height:15.0pt\">";
+		content += "<td width=\"77\" nowrap=\"\"   valign=\"bottom\"   style=\"  border:solid windowtext 1.0pt;background:;padding:0in 5.4pt 0in 5.4pt;  height:15.0pt\">    <p class=\"MsoNormal\" align=\"left\" style=\"\"> <span style=\"font-size:9.5pt;color:000000;\"> </p></td>";
+		content += "<td width=\"77\" nowrap=\"\"   valign=\"bottom\"   style=\"  border:solid windowtext 1.0pt;background:;padding:0in 5.4pt 0in 5.4pt;  height:15.0pt\">    <p class=\"MsoNormal\" align=\"left\" style=\"\"> <span style=\"font-size:9.5pt;color:000000;\"> ";
+		content += "<ol>";
+		if (plndlvNames != null) {
+			for (int i = 0; i < plndlvNames.size(); i++) {
+				content += "<li> " + plndlvNames.get(i).toString() + "</li>";
+			}
+		}
+		content += "</ol>";
+		content += "</p></td>";
+		content += "<td width=\"77\" nowrap=\"\"   valign=\"bottom\"   style=\"  border:solid windowtext 1.0pt;;padding:0in 5.4pt 0in 5.4pt;  height:15.0pt\">    <p class=\"MsoNormal\" align=\"left\" style=\"\">  <span style=\"font-size:9.5pt;color:000000;\"> ";
+		content += "<ol>";
+		if (unplndlvNames != null) {
+			for (int i = 0; i < unplndlvNames.size(); i++) {
+				content += "<li> " + unplndlvNames.get(i).toString() + "</li>";
+			}
+		}
+		content += "</ol>";
+		content += "</p></td>";
+		content += "<td width=\"77\" nowrap=\"\"   valign=\"bottom\"   style=\"  border:solid windowtext 1.0pt;;padding:0in 5.4pt 0in 5.4pt;  height:15.0pt\">    <p class=\"MsoNormal\" align=\"left\" style=\"\">  <span style=\"font-size:9.5pt;color:000000;\"> ";
+		content += "<ol>";
+		if (wfhNames != null) {
+			for (int i = 0; i < wfhNames.size(); i++) {
+				content += "<li> " + wfhNames.get(i).toString() + "</li>";
+			}
+		}
+		content += "</ol>";
+		content += "</p></td>";
+		content += "</tr>";
+		content += "</tbody></table>";
+		content += "<p class=MsoNormal>\r\n" + "	<o:p>&nbsp;</o:p>\r\n" + "		</p>\r\n" + "\r\n"
+				+ "		<p class=MsoNormal>\r\n" + "	<o:p>&nbsp;</o:p>\r\n" + "		</p>\r\n" + "\r\n"
+				+ "		<p class=MsoNormal>\r\n" + "	<o:p>&nbsp;</o:p>\r\n" + "		</p>";
+
+		return content;
+	}
+
+	private List<String> getWFHNameList() {
+		// TODO Auto-generated method stub
+		return wfhList;
+	}
+
+	private List<String> getPlannedLeavesNameList() {
+
+		return plndLvList;
+	}
+
+	private consolidator openAllExcel() {
+		for (int i = 0; i < files.length; i++) {
+			try {
+				Desktop.getDesktop().open(new File(files[i]));
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
+		return this;
+	}
+
+	List<String> plndLvList, unplndLvList, wfhList;
+
+	private List<String> getUnplannedLeavesNameList() throws Exception, IOException {
+
+		return unplndLvList;
+	}
+
+	public consolidator getListFrmLeaveTracker() throws Exception, IOException {
+		XSSFWorkbook wb = new XSSFWorkbook(new FileInputStream(getLeaveTracker()));
+		// System.out.println(getLeaveTracker());
+		DateFormat df = new SimpleDateFormat("dd/MM/yyyy");
+		int columnIdx = 0;
+		Date date = null, currentDate = new Date();
+		plndLvList = new ArrayList<>();
+		unplndLvList = new ArrayList<>();
+		wfhList = new ArrayList<>();
+		for (int i = 5; i < wb.getSheet("Leave Details").getRow(1).getLastCellNum(); i++) {
+			date = wb.getSheet("Leave Details").getRow(1).getCell(i).getDateCellValue();
+			// System.out.println(i + " " + wb.getSheet("Leave
+			// Details").getRow(1).getCell(i).getDateCellValue());
+			if (df.format(date).toString().equals(df.format(currentDate).toString())) {
+
+				columnIdx = i;
+				break;
+			}
+		}
+
+		// System.out.println(columnIdx);
+
+		for (int i = 6; i < wb.getSheet("Leave Details").getLastRowNum(); i++) {
+			String temp = "";
+
+			if (wb.getSheet("Leave Details").getRow(i).getCell(columnIdx).getCellType() == CellType.BLANK
+					|| wb.getSheet("Leave Details").getRow(i).getCell(columnIdx).getCellType() == CellType.STRING) {
+				temp = wb.getSheet("Leave Details").getRow(i).getCell(columnIdx).getStringCellValue();
+			} else {
+				temp = wb.getSheet("Leave Details").getRow(i).getCell(columnIdx).getRawValue().toString();
+			}
+			// if (wb.getSheet("Leave
+			// Details").getRow(i).getCell(3).getStringCellValue().equals(null)) {
+			if (temp.equals("W")) {
+				wfhList.add(wb.getSheet("Leave Details").getRow(i).getCell(2).getStringCellValue());
+			} else if (temp.equals("P")) {
+				plndLvList.add(wb.getSheet("Leave Details").getRow(i).getCell(2).getStringCellValue());
+			} else if (temp.equals("U")) {
+				unplndLvList.add(wb.getSheet("Leave Details").getRow(i).getCell(2).getStringCellValue());
+			}
+			// }
+
+		}
+
+		return this;
+	}
+
+	private String getLeaveTracker() {
+
+		for (String file : files) {
+			if (file.contains("Roll Out Leave Tracker")) {
+				return file;
+			}
+		}
+		return "";
+	}
+
+	static String[][] MergeMap = null;
+
+	private String getContentFromExcel(String Filename, int summaryPageIndex, int startRowIndex)
+			throws FileNotFoundException, IOException {
+		FileInputStream fis = new FileInputStream(new File(Filename));
+		XSSFWorkbook wb = new XSSFWorkbook(fis);
+
+		// System.out.println(alphabet.length);
+		// System.out.println(wb.getSheetAt(summaryPageIndex).getLastRowNum());
+		// System.out.println(wb.getSheetAt(summaryPageIndex).getRow(1).getLastCellNum());
+
+		MergeMap = getContentArray(wb, summaryPageIndex, startRowIndex);
+
+		String leave_content = "<table class=\"MsoNormalTable\" border=\"0\" cellspacing=\"0\" cellpadding=\"0\" width=\"975\" style=\"width:731.05pt;margin-left:-.15pt;border-collapse:collapse;mso-yfti-tbllook:\r\n"
+				+ " 1184;mso-padding-alt:0in 0in 0in 0in\"><tbody>";
+		for (int i = 0; i < MergeMap.length; i++) {
+			leave_content += "<tr style=\"mso-yfti-irow:" + i + ";"
+					+ ((i == 0) ? "mso-yfti-firstrow:yes;" : ((i == 0) ? "mso-yfti-lastrow:yes;" : ""))
+					+ " ;height:15.0pt\">";
+			leave_content += getEachRowContent(wb, i, startRowIndex);
+			leave_content += "</tr>";
+
+		}
+		leave_content += "</tbody></table>";
+		leave_content += "<p class=MsoNormal>\r\n" + "	<o:p>&nbsp;</o:p>\r\n" + "		</p>\r\n" + "\r\n"
+				+ "		<p class=MsoNormal>\r\n" + "	<o:p>&nbsp;</o:p>\r\n" + "		</p>\r\n" + "\r\n"
+				+ "		<p class=MsoNormal>\r\n" + "	<o:p>&nbsp;</o:p>\r\n" + "		</p>";
+
+		return leave_content;
+	}
+
+	String root = null;
+
+	private String[][] getContentArray(XSSFWorkbook wb, int summaryPageIndex, int startRowIdx) {
+
+		String[][] arr = new String[wb.getSheetAt(summaryPageIndex).getLastRowNum()][wb.getSheetAt(summaryPageIndex)
+				.getRow(1).getLastCellNum()];
+		// System.out.println(arr.length + " " + arr[0].length);
+		for (int i = 0; i < arr.length; i++) {
+			for (int j = 0; j < arr[i].length; j++) {
+				// // System.out.println(i + " " + j);
+				root = "";
+				if (getMergedRegionForCell(
+						wb.getSheetAt(summaryPageIndex).getRow(i + startRowIdx).getCell(j)) != null) {
+					root = "" + getMergedRegionForCell(
+							wb.getSheetAt(summaryPageIndex).getRow(i + startRowIdx).getCell(j));
+				}
+
+				if (wb.getSheetAt(summaryPageIndex).getRow(i + startRowIdx).getCell(j).getCellType() == CellType.STRING
+						|| wb.getSheetAt(summaryPageIndex).getRow(i + startRowIdx).getCell(j)
+								.getCellType() == CellType.BLANK) {
+					arr[i][j] = ((root.equals("") || root.equals(null)) ? ""
+							: root.substring(root.indexOf("[") + 1, root.indexOf("]")) + "--$")
+							+ wb.getSheetAt(summaryPageIndex).getRow(i + startRowIdx).getCell(j).getStringCellValue();
+
+				} else {
+					arr[i][j] = ((root.equals("") || root.equals(null)) ? ""
+							: root.substring(root.indexOf("[") + 1, root.indexOf("]")) + "--$")
+							+ wb.getSheetAt(summaryPageIndex).getRow(i + startRowIdx).getCell(j).getRawValue() + "";
+
+				}
+			}
+		}
+		return arr;
+	}
+
+	public CellRangeAddress getMergedRegionForCell(Cell c) {
+		Sheet s = c.getRow().getSheet();
+		for (CellRangeAddress mergedRegion : s.getMergedRegions()) {
+			if (mergedRegion.isInRange(c.getRowIndex(), c.getColumnIndex())) {
+
+				return mergedRegion;
+			}
+		}
+
+		return null;
+	}
+
+	private String getContentFrmFile(String Filename) throws Exception {
+		return new String(Files.readAllBytes(Paths.get(Filename)));
+	}
+
+	private static String getEachRowContent(XSSFWorkbook wb, int i, int startRowIndex) {
+		String content = "";
+
+		String rowspan = "", colspan = "", arrayValue = "";
+		for (int j = 0; j < MergeMap[i].length; j++) {
+
+			arrayValue = MergeMap[i][j];
+			// System.out.println(arrayValue);
+			printarray();
+			if (arrayValue.contains("--")) {
+				String[] splitedString = arrayValue.split("--");
+				if (splitedString[0].substring(0, 1).equals(splitedString[0]
+						.substring(splitedString[0].indexOf(":") + 1, splitedString[0].indexOf(":") + 2))) {
+					String[] splitUsingColon = splitedString[0].split(":"); // rowmerge-
+																			// rowspan
+
+					int startnumb = Integer.parseInt(splitUsingColon[0].substring(1));
+					int endnumb = Integer.parseInt(splitUsingColon[1].substring(1)), diff = 0;
+					diff = endnumb - startnumb;
+					diff = diff + 1;
+					if (!splitedString[1].equals("$")) {
+						content += printElement(wb, i, j, "", diff + "", startRowIndex);
+						content += " <o:p></o:p>\r\n" + "</span> " + ((i > 2) ? "" : " </b>\r\n") + "</p>" + " </td>";
+					}
+				} else if (!splitedString[0].substring(0, 1).equals(splitedString[0]
+						.substring(splitedString[0].indexOf(":") + 1, splitedString[0].indexOf(":") + 2))) {
+					String[] splitUsingColon = splitedString[0].split(":"); // colmerge
+																			// --
+																			// colspan
+					String startLetter = splitUsingColon[0].substring(0, 1),
+							endLetter = splitUsingColon[1].substring(0, 1);
+					int startId = getAlphabetIndex(startLetter), endId = getAlphabetIndex(endLetter), diff = 0;
+					diff = endId - startId;
+					diff = diff + 1;
+					if (!splitedString[1].equals("$")) {
+						content += printElement(wb, i, j, diff + "", "", startRowIndex);
+						content += " <o:p></o:p>\r\n" + "</span> " + ((i > 2) ? "" : " </b>\r\n") + "</p>" + " </td>";
+					}
+				}
+
+			} else {
+				content += printElement(wb, i, j, "", "", startRowIndex);
+				content += " <o:p></o:p>\r\n" + "</span> " + " </b>" + "</p>" + " </td>";
+
+			}
+
+		}
+
+		return content;
+	}
+
+	private static int getAlphabetIndex(String Letter) {
+
+		int len = alphabet.length;
+		int i = 0;
+
+		while (i < len) {
+
+			if (alphabet[i].equals(Letter)) {
+				return i;
+			} else {
+				i = i + 1;
+			}
+		}
+		return -1;
+
+	}
+
+	public static String printElement(XSSFWorkbook wb, int i, int j, String colspan, String rowspan, int startRowIdx) {
+		String content = "";
+		XSSFCellStyle cellStyle = wb.getSheetAt(summaryPageIndex).getRow(i + startRowIdx).getCell(j).getCellStyle();
+		XSSFColor color = wb.getSheetAt(summaryPageIndex).getRow(i + startRowIdx).getCell(j).getCellStyle()
+				.getFillForegroundColorColor();
+		content += "<td width=\""
+				+ ((j == wb.getSheetAt(summaryPageIndex).getRow(i + startRowIdx).getLastCellNum()) ? "120" : "77")
+				+ "\" nowrap=\"\" " + ((colspan.equals("")) ? "" : "colspan=\"" + colspan + "\"") + " "
+				+ ((rowspan.equals("")) ? "" : "rowspan=\"" + rowspan + "\"") + " valign=\"bottom\"" + " " + " "
+				+ " style=\"" + "  border:solid windowtext 1.0pt;"
+				+ ((color != null) ? "background:#" + color.getARGBHex().toLowerCase().substring(2)
+						: "background:#ffffff")
+				+ ";padding:0in 5.4pt 0in 5.4pt;" + "  height:15.0pt\">"
+				+ "    <p class=\"MsoNormal\" align=\"left\" style=\"\">\r\n" + ((i > 2) ? "" : " <b>\r\n")
+				+ " <span style=\"font-size:9.5pt;color:"
+				+ cellStyle.getFont().getXSSFColor().getARGBHex().toLowerCase().substring(2) + ";\">";
+		if (wb.getSheetAt(summaryPageIndex).getRow(i + startRowIdx).getCell(j).getCellType() == CellType.STRING
+				|| wb.getSheetAt(summaryPageIndex).getRow(i + startRowIdx).getCell(j).getCellType() == CellType.BLANK) {
+			content += wb.getSheetAt(summaryPageIndex).getRow(i + startRowIdx).getCell(j).getStringCellValue();
+		} else {
+			content += wb.getSheetAt(summaryPageIndex).getRow(i + startRowIdx).getCell(j).getRawValue();
+		}
+		return content;
+	}
+
+	private static void printarray() {
+		// TODO Auto-generated method stub
+
+		for (int i = 0; i < MergeMap.length; i++) {
+			for (int j = 0; j < MergeMap[i].length; j++) {
+				System.out.print(MergeMap[i][j] + " \t");
+			}
+			System.out.print("\n");
+		}
+		System.out.println("\n\n\n\n");
+	}
+
+	public void consolidateToMailfile() throws Exception, MessagingException {
+		try (OutputStream out = new FileOutputStream("consolidate.eml")) {
+			generateMessage().writeTo(out);
+		}
+	}
+
+	private MimeMessage generateMessage() throws Exception {
+		MimeMessage msg = new MimeMessage(session);
+		msg.addFrom(fromAddress);
+		msg.setReplyTo(toAddress);
+		msg.setSubject("subject");
+		MimeBodyPart textPart = new MimeBodyPart();
+		textPart.setText("Body's text (text)", "UTF-8");
+		MimeBodyPart htmlPart = new MimeBodyPart();
+		htmlPart.setContent(getConsolidatedContent(), "text/html; charset=UTF-8");
+		Multipart multiPart = new MimeMultipart("alternative");
+		multiPart.addBodyPart(textPart); // first
+		multiPart.addBodyPart(htmlPart); // second
+		msg.setContent(multiPart);
+		msg.addHeader("X-Custom-Header", "CustomValue");
+		return msg;
+	}
+
+}
