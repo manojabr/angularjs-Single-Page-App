@@ -1,0 +1,73 @@
+import java.io.File;
+import java.io.*;
+import java.io.InputStream;
+
+import com.jacob.activeX.ActiveXComponent;
+import com.jacob.com.ComThread;
+import com.jacob.com.Dispatch;
+import com.jacob.com.LibraryLoader;
+import com.jacob.com.Variant;
+
+public class zczxc {
+
+	public static void main(String[] args) {
+		String strInputDoc = "C:\\chrome\\Roll out Tracker.xlsx"; // file to be opened.
+
+		ComThread.InitSTA();
+
+		ActiveXComponent xl = null; // Instance of application object created.
+		File file = new File(strInputDoc);
+		try {
+			// Get Excel application object properties in 2 ways:
+			xl = new ActiveXComponent("Excel.Application");
+			Dispatch excelObject = xl.getObject();
+			Dispatch workbooks = xl.getProperty("Workbooks").toDispatch();
+			Dispatch workbook = Dispatch.call(workbooks, "Add", file.getAbsolutePath()).toDispatch();
+
+			System.out.println("version=" + xl.getProperty("Version"));
+			System.out.println("version=" + Dispatch.get(xl, "Version"));
+
+			// Make Excel instance visible:
+			Dispatch.put(xl, "Visible", new Variant(true));
+
+			// Open XLS file, get the workbooks object required for access:
+			// Dispatch workbook = xl.getProperty("Workbooks").toDispatch();
+//			Dispatch.call(workbook, "Open", new Variant(strInputDoc), new Variant("1"));
+
+			Dispatch sheets = Dispatch.get(workbook, "Sheets").toDispatch();
+			Dispatch sheet = Dispatch.invoke(sheets, "Item", Dispatch.Get, new Object[] { "Sheet2" }, new int[0])
+					.getDispatch();
+
+		
+			// put in a value in cell A22 and place a a formula in cell A23:
+			Dispatch a22 = Dispatch.invoke(sheet, "Range", Dispatch.Get, new Object[] { "A22" }, new int[1])
+					.toDispatch();
+
+			Dispatch a23 = Dispatch.invoke(sheet, "Range", Dispatch.Get, new Object[] { "A23" }, new int[1])
+					.toDispatch();
+
+			Dispatch.put(a22, "Value", "123.456");
+			Dispatch.put(a23, "Formula", "=A22*2");
+
+			// Get values from cells A1 and A2
+//			System.out.println("a22 from excel:" + Dispatch.get(a22, "Value"));
+//			System.out.println("a23 from excel:" + Dispatch.get(a23, "Value"));
+
+			// Save the open workbook as "C:\jacob-1.16-M1\Test1.xls" file:
+			Dispatch.call(workbook, "Save", new Variant("C:\\chrome\\Test1.xlsx"), new Variant("1"));
+
+			// Close the Excel workbook without saving:
+			excelObject.safeRelease();
+
+		} catch (Exception e) {
+			e.printStackTrace();
+		} finally {
+
+			// Quit Excel:
+			// xl.invoke("Quit", new Variant[] {});
+			ComThread.Release();
+
+		}
+
+	}
+}
