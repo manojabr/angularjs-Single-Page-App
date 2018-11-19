@@ -1,0 +1,924 @@
+import java.awt.Desktop;
+import java.io.*;
+import java.util.*;
+
+public class newConsolidator extends MsgCreator {
+	static Properties prop;
+	
+
+	public static void main(String[] args) throws Exception {
+		try {
+			prop = new Properties();
+			newConsolidator consolidate = new newConsolidator();
+			consolidate.setUp().consolidateToMailfile();
+			consolidate.close();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+
+	private newConsolidator setUp() throws Exception {
+		InputStream input = getPropertiesFile();
+		if (input == null) {
+			println("Sorry, unable to find file");
+			return null;
+		}
+		prop.load(input);
+		return this;
+	}
+
+	private void consolidateToMailfile() throws Exception, IOException {
+		String destination = prop.getProperty("outputdir");
+		File theFile = new File(destination);
+		if (!theFile.exists()) {
+			theFile.mkdirs();
+		}
+		try (OutputStream out = new FileOutputStream(destination + prop.getProperty("filename"))) {
+			println("Mail File Created");
+			generateMessage().writeTo(out);
+			println("Content has been Updated to the mail");
+		}
+
+	}
+
+	private void close() throws Exception {
+		println("Process completed.. Consolidated Mail in " + prop.getProperty("outputdir") + prop.getProperty("filename")
+				+ "\nFolder will be opens shortly");
+		Thread.sleep(1000);
+		Desktop.getDesktop().open(new File(prop.getProperty("outputdir")));
+	}
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+import java.io.*;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.logging.SimpleFormatter;
+
+import org.apache.poi.ss.usermodel.*;
+
+import org.apache.poi.ss.util.CellRangeAddress;
+import org.apache.poi.xssf.usermodel.*;
+import org.json.simple.*;
+import org.json.simple.parser.*;
+
+public class ContentBuilder {
+	private static JSONParser parser;
+	private static JSONObject jsnObj;
+	private static String[] filepat = { "", "B A", "Agency", "Comprater", "GW", "Integ", "Forms", "PERS", "QA" };
+	private static String[][] MergeMap;
+	private static JSONArray pgIdxList;
+	private static XSSFWorkbook wb;
+	private static final String regex = "(?<=\\D)(?=\\d)";
+	private static int startRowIdx = 0;
+	static FormulaEvaluator formulaEval;
+	public static String[] files = { "G:\\all\\excelFiles\\Kemper R2 State Rollout Productivity Tracker.xlsm",
+			"G:\\all\\excelFiles\\R2 AgencyPortal Productivity Tracker.xlsx",
+			"G:\\all\\excelFiles\\R2 Comprater Productivity Tracker.xlsx",
+			"G:\\all\\excelFiles\\R2 B A  Productivity tracker.xlsx",
+			"G:\\all\\excelFiles\\R2 Forms Dev Productivity Tracker.xlsx",
+			"G:\\all\\excelFiles\\R2 GW Productivity Tracker.xlsx",
+			"G:\\all\\excelFiles\\R2 Integ Dev Productivity Tracker.xlsx",
+			"G:\\all\\excelFiles\\R2 PERS Dev Productivity Tracker.xlsx",
+			"G:\\all\\excelFiles\\R2 State Roll Out Leave Tracker.xlsx",
+			"G:\\all\\excelFiles\\R2_QA_Productivity Tracker.xlsx"
+
+	};
+
+	public static String getConsolidatedContent() throws Exception, ParseException {
+		parser = new JSONParser();
+		jsnObj = (JSONObject) parser.parse(new FileReader(newConsolidator.prop.getProperty("setting")));
+		MsgCreator.println(newConsolidator.prop.getProperty("pageIndex2"));
+
+		String mainContent = "", content = "", projectSum = "";
+		String header = getHeader();
+		String footer = getfooter();
+		content = createLeaveTable();
+		projectSum = createProjSumTbl();
+
+		for (int i = 1; i <= 8; i++) {
+			content += getContentFromExcel(getTrackerbyName(i), i);
+		}
+		mainContent = header + projectSum + content + footer;
+		return mainContent;
+	}
+
+	private static String createProjSumTbl() throws Exception, IOException {
+		String content = "";
+		double leadsavail = 0, PlnFTE = 0, P_uP_Leaves = 0, Plnd = 0, actu = 0;
+		String[] heading = { "Streams", "Leads Available", "Planned FTEs", "Planned / Unplanned Leaves", "Planned",
+				"Actual", "In %" };
+		String[] sideHeading = { "", "", "Business Analysts", "AgencyPortal", "Comparter", "Guidewire Config",
+				"Guidewire Integ", "Forms", "PERS", "QA", "Total" };
+		int rownum = 0;
+		XSSFSheet sheet;
+		content += jsnObj.get("oTbltg").toString();
+
+		content += "<tr style=\"mso-yfti-irow:0;mso-yfti-firstrow:yes;height:11.5pt\">\r\n"
+				+ "			<td width=\"1020\" nowrap=\"\" colspan=\"4\" style=\"width:764.7pt;border:solid windowtext 1.0pt;\r\n"
+				+ "  background:#00B050;padding:0in 5.4pt 0in 5.4pt;height:11.5pt\">\r\n"
+				+ "				<p style=\"text-align:center;mso-element:frame;\r\n"
+				+ "  mso-element-frame-hspace:9.0pt;mso-element-wrap:around;mso-element-anchor-vertical:\r\n"
+				+ "  paragraph;mso-element-anchor-horizontal:column;mso-height-rule:exactly\">\r\n" + " <b>\r\n"
+				+ "	 <span style=\"font-size:10.0pt\">Project Summary - "
+				+ new SimpleDateFormat("dd//MM/yyyy").format(new Date()) + "<o:p/>\r\n"
+				+ "						</span>\r\n" + "	</b>\r\n" + "				</p>\r\n"
+				+ "			</td>\r\n" + "<td colspan=\"3\" style=\"width:764.7pt;border:solid windowtext 1.0pt;\r\n"
+				+ "  background:#92D050;padding:0in 5.4pt 0in 5.4pt;height:11.5pt\">\r\n"
+				+ "				<p style=\"text-align:center;mso-element:frame;\r\n"
+				+ "  mso-element-frame-hspace:9.0pt;mso-element-wrap:around;mso-element-anchor-vertical:\r\n"
+				+ "  paragraph;mso-element-anchor-horizontal:column;mso-height-rule:exactly\">\r\n" + "		<b>\r\n"
+				+ "						<span style=\"font-size:10.0pt\"> Day Productivity <o:p/>\r\n"
+				+ "						</span>\r\n" + "					</b>\r\n" + "				</p>\r\n"
+				+ "			</td>" + "	</tr>";
+		for (int i = 1; i < 11; i++) {
+			content += "<tr style=\"mso-yfti-irow: 0; " + ((i == 11 - 1) ? "mso-yfti-lastrow: yes" : "") + "; height: "
+					+ ((i == 1) ? "24.5pt" : "14.5pt") + " \">";
+			for (int j = 0; j < 7; j++) {
+				System.out.println(i + "    " + j);
+				content += "<td width=\"1020\" nowrap=\"\" style=\"border:solid windowtext 1.0pt;\r\n"
+						+ "  background:#FFE699;padding:0in 5.4pt 0in 5.4pt;height:11.5pt\">"
+						+ " <p align=\"left\" style=\"\">\r\n";
+				if (i == 1) {
+					content += heading[j];
+				} else if (j == 0 && i >= 2) {
+					content += sideHeading[i];
+				} else {
+					double value = 0;
+					if (i >= 2 && i < 9) {
+						double plnd = 0, actual = 0, In = 0;
+						String filea = getTrackerbyName(i - 1);
+
+						System.out.println(filea + ": " + i + "  " + j);
+						wb = new XSSFWorkbook(new FileInputStream(new File(filea)));
+						formulaEval = wb.getCreationHelper().createFormulaEvaluator();
+						sheet = wb.getSheet(jsnObj.get("summaryPgName-" + (i - 1)).toString());
+						if (j > 0 && j < 6) { // BA,AP,comprater,Config, Integ,forms,pers Value
+							String temp = jsnObj.get("tblind-" + (i - 1)).toString();
+							String[] dim = getSplited(temp, ":");
+							dim = getSplited(dim[1], regex);
+							rownum = Integer.parseInt(dim[1]);
+							value = sheet.getRow(rownum - 1).getCell(j).getNumericCellValue();
+							content += value;
+							if (j == 1) {
+								leadsavail += value;
+							} else if (j == 2) {
+								PlnFTE += value;
+							} else if (j == 3) {
+								P_uP_Leaves += value;
+							} else if (j == 4) {
+								Plnd += value;
+								plnd = (int) sheet.getRow(rownum - 1).getCell(j).getNumericCellValue();
+							} else if (j == 5) {
+								actu += value;
+								actual = (int) sheet.getRow(rownum - 1).getCell(j).getNumericCellValue();
+							}
+
+						} else if (j == 6) {
+
+							In = (actual / plnd) * 100;
+							content += In + "%";
+						}
+						wb.close();
+					} else if (i == 9) { // QA value
+						
+						double plnd = 0, actual = 0, In = 0;
+						wb = new XSSFWorkbook(new FileInputStream(new File(getTrackerbyName(i - 1))));
+						formulaEval = wb.getCreationHelper().createFormulaEvaluator();
+						sheet = wb.getSheet(jsnObj.get("summaryPgName-" + (i - 1)).toString());
+						Cell cell;
+						if (j > 0 && j < 4) {
+							String temp = jsnObj.get("tblind-" + (i - 1)).toString();
+							String[] dim = getSplited(temp, ":");
+							dim = getSplited(dim[1], regex);
+							rownum = Integer.parseInt(dim[1]);
+							cell = sheet.getRow(rownum - 1).getCell(j);
+							if (cell.getCellType() == CellType.FORMULA) {
+								CellValue c = formulaEval.evaluate(cell);
+								value = c.getNumberValue();
+							} else {
+								
+								value = cell.getNumericCellValue();
+							}
+							content += value;
+
+							if (j == 1) {
+								leadsavail += value;
+							} else if (j == 2) {
+								PlnFTE += value;
+							} else if (j == 3) {
+								P_uP_Leaves += value;
+							}
+						} else if (j == 4 && j < 6) {
+							double temp = 0;
+							Row row = sheet.getRow(rownum - 1);
+							if (j == 4) {
+								int[] cellid = { 5, 8, 10, 12, 14, 16 };
+								for (int ij = 0; ij < cellid.length; ij++) {
+									
+									cell = sheet.getRow(rownum - 1).getCell(cellid[ij]);
+									
+									System.out.println(cell);
+									if (cell.getCellType() == CellType.FORMULA) {
+										CellValue c = formulaEval.evaluate(cell);
+										value = c.getNumberValue();
+									} else {
+										
+										value = cell.getNumericCellValue();
+									}
+									temp += value;
+								}
+								content += temp;
+								Plnd += temp;
+								plnd = temp;
+							} else if (j == 5) {
+								int[] cellid = { 6, 9, 11, 13, 15, 17 };
+								for (int ij = 0; ij < cellid.length; ij++) {
+									Cell cells = sheet.getRow(rownum - 1).getCell(cellid[ij]);
+									if (cells.getCellType() == CellType.FORMULA) {
+										CellValue c = formulaEval.evaluate(cells);
+										value = c.getNumberValue();
+									} else {
+										
+										value = cells.getNumericCellValue();
+									}
+									temp += value;
+								}
+								content += temp;
+								actu += temp;
+								actual = temp;
+							} else if (j == 6) {
+								In = (actual / plnd) * 100;
+								content += In + "%";
+							}
+						}
+					} else if (i == 10) { // Total
+						double plnd = 0, actual = 0, In = 0;
+						if (j == 1) {
+							content += leadsavail;
+						} else if (j == 2) {
+							content += PlnFTE;
+						} else if (j == 3) {
+							content += P_uP_Leaves;
+						} else if (j == 4) {
+							content += Plnd;
+							plnd = Plnd;
+						} else if (j == 5) {
+							content += actu;
+							actual = actu;
+						} else if (j == 6) {
+							In = (actual / plnd) * 100;
+							content += In + "%";
+						}
+					}
+				}
+				content += "</p></td>";
+
+			}
+			content += "</tr>";
+
+		}
+
+		content += jsnObj.get("cTbltg").toString();
+
+		return content;
+	}
+
+	private static String getTrackerbyName(int i) {
+
+		for (String file : files) {
+			if (file.contains(filepat[i])) {
+				return file;
+			}
+		}
+
+		return "";
+	}
+
+	private static String getContentFromExcel(String Filename, int summaryPageIndex)
+			throws FileNotFoundException, IOException {
+		FileInputStream fis = new FileInputStream(new File(Filename));
+		wb = new XSSFWorkbook(fis);
+		String tblIdx = jsnObj.get("tblind-" + summaryPageIndex).toString();
+		MergeMap = getContentArray(wb.getSheet(jsnObj.get("summaryPgName-" + summaryPageIndex).toString()), tblIdx);
+		printarray();
+		String leave_content = "";
+		leave_content += "<table class=\"MsoNormalTable\" border=\"0\" cellspacing=\"0\" cellpadding=\"0\"\r\n"
+				+ "	width=\"1057\"\r\n"
+				+ "	style=\"width: 793.0pt; border-collapse: collapse; mso-yfti-tbllook: 1184; mso-padding-alt: 0in 0in 0in 0in\">\r\n"
+				+ "	<tbody>";
+		for (int i = 0; i < MergeMap.length; i++) {
+
+			leave_content += "<tr style=\"mso-yfti-irow: 0; "
+					+ ((i == 0) ? "mso-yfti-firstrow: yes" : (i == MergeMap.length - 1) ? "mso-yfti-lastrow: yes" : "")
+					+ "; height: " + ((i == 1) ? "24.5pt" : "14.5pt") + " \">";
+
+			leave_content += getEachRowContent(wb.getSheetAt(summaryPageIndex), i, startRowIdx);
+			leave_content += "</tr>";
+
+		}
+		leave_content += "</tbody></table>";
+		leave_content += jsnObj.get("nxln").toString() + jsnObj.get("nxln").toString() + jsnObj.get("nxln").toString();
+
+		return leave_content;
+	}
+
+	private static String getEachRowContent(XSSFSheet xssfSheet, int i, int startRowIndex) {
+		String content = "";
+
+		String rowspan = "", colspan = "", arrayValue = "";
+		for (int j = 0; j < MergeMap[i].length; j++) {
+			XSSFFont font = xssfSheet.getRow(i + (startRowIndex - 1)).getCell(j).getCellStyle().getFont();
+			arrayValue = MergeMap[i][j];
+			if (arrayValue.contains("--")) {
+				String[] splitedString = getSplited(arrayValue, "--");
+
+				if (splitedString[0].substring(0, 1).equals(splitedString[0]
+						.substring(splitedString[0].indexOf(":") + 1, splitedString[0].indexOf(":") + 2))) {
+					String[] splitUsingColon = getSplited(splitedString[0], ":"); // rowmerge-// rowspan
+
+					int startnumb = Integer.parseInt(splitUsingColon[0].substring(1));
+					int endnumb = Integer.parseInt(splitUsingColon[1].substring(1)), diff = 0;
+					diff = endnumb - startnumb;
+					diff = diff + 1;
+					if (!splitedString[1].equals("$")) {
+						content += printElement(xssfSheet, i, j, "", diff + "", startRowIndex - 1);
+						content += " <o:p></o:p>\r\n" + "</span> " + ((font.getBold() == false) ? "" : " </b>\r\n")
+								+ "</p>" + " </td>";
+					}
+				} else if (!splitedString[0].substring(0, 1).equals(splitedString[0]
+						.substring(splitedString[0].indexOf(":") + 1, splitedString[0].indexOf(":") + 2))) {
+					String[] splitUsingColon = getSplited(splitedString[0], ":"); // colmerge -- colspan
+					String startLetter = splitUsingColon[0].substring(0, 1),
+							endLetter = splitUsingColon[1].substring(0, 1);
+					int startId = getColumnIdx(startLetter), endId = getColumnIdx(endLetter), diff = 0;
+					diff = endId - startId;
+					diff = diff + 1;
+					if (!splitedString[1].equals("$")) {
+						content += printElement(xssfSheet, i, j, diff + "", "", startRowIndex - 1);
+						content += " <o:p></o:p>\r\n" + "</span> " + ((font.getBold() == false) ? "" : " </b>\r\n")
+								+ "</p>" + " </td>";
+					}
+				}
+
+			} else {
+				content += printElement(xssfSheet, i, j, "", "", startRowIndex - 1);
+				content += " <o:p></o:p>\r\n" + "</span> " + ((font.getBold() == false) ? "" : " </b>\r\n") + "</p>"
+						+ " </td>";
+
+			}
+
+		}
+
+		return content;
+	}
+
+	public static String printElement(XSSFSheet xssfSheet, int i, int j, String colspan, String rowspan,
+			int startRowIdx) {
+		String content = "";
+		XSSFCellStyle cellStyle = xssfSheet.getRow(i + startRowIdx).getCell(j).getCellStyle();
+		XSSFColor color = xssfSheet.getRow(i + startRowIdx).getCell(j).getCellStyle().getFillForegroundColorColor();
+		content += "<td width=\"" + ((j == xssfSheet.getRow(i + startRowIdx).getLastCellNum()) ? "135" : "104")
+				+ "\" nowrap=\"\" " + ((colspan.equals("")) ? "" : "colspan=\"" + colspan + "\"") + " "
+				+ ((rowspan.equals("")) ? "" : "rowspan=\"" + rowspan + "\"") + " valign=\"center\"" + " " + " "
+				+ " style=\"" + "  border:solid #A6A6A6 1.0pt;"
+				+ ((color != null) ? "background:#" + color.getARGBHex().toLowerCase().substring(2)
+						: "background:#ffffff")
+				+ ";padding:0in 5.4pt 0in 5.4pt;" + "  height:15.0pt\">"
+				+ "    <p class=\"MsoNormal\" align=\"left\" style=\"\">\r\n"
+				+ ((cellStyle.getFont().getBold() == false) ? "" : " <b>\r\n") + " <span style=\"color:#"
+				+ cellStyle.getFont().getXSSFColor().getARGBHex().toLowerCase().substring(2) + ";font-size:"
+				+ ((i == 0) ? "11.pt" : "9.pt;") + "  \">";
+		if (xssfSheet.getRow(i + startRowIdx).getCell(j).getCellType() == CellType.STRING
+				|| xssfSheet.getRow(i + startRowIdx).getCell(j).getCellType() == CellType.BLANK) {
+			content += xssfSheet.getRow(i + startRowIdx).getCell(j).getStringCellValue();
+		} else {
+			content += xssfSheet.getRow(i + startRowIdx).getCell(j).getRawValue();
+		}
+		return content;
+	}
+
+	private static String[][] getContentArray(XSSFSheet xssfSheet, String tblIdx) {
+
+		String[] splitedByColon = getSplited(tblIdx, ":"), startRow = getSplited(splitedByColon[0], regex),
+				endRow = getSplited(splitedByColon[1], regex);
+
+		String[][] arr = new String[(Integer.parseInt(endRow[1]) - Integer.parseInt(startRow[1]))
+				+ 1][getColumnIdx(endRow[0]) - getColumnIdx(startRow[0]) + 1];
+		startRowIdx = Integer.parseInt(startRow[1]);
+		System.out.println(arr.length + " " + arr[0].length);
+		for (int i = 0; i < arr.length; i++) {
+			for (int j = 0; j < arr[i].length; j++) {
+				String root = "";
+				if (getMergedRegionForCell(xssfSheet.getRow(i + (startRowIdx - 1)).getCell(j)) != null) {
+					root = "" + getMergedRegionForCell(xssfSheet.getRow(i + (startRowIdx - 1)).getCell(j));
+				}
+
+				if (xssfSheet.getRow(i + (startRowIdx - 1)).getCell(j).getCellType() == CellType.STRING
+						|| xssfSheet.getRow(i + (startRowIdx - 1)).getCell(j).getCellType() == CellType.BLANK) {
+					arr[i][j] = ((root.equals("") || root.equals(null)) ? ""
+							: root.substring(root.indexOf("[") + 1, root.indexOf("]")) + "--$")
+							+ xssfSheet.getRow(i + (startRowIdx - 1)).getCell(j).getStringCellValue();
+
+				} else {
+					arr[i][j] = ((root.equals("") || root.equals(null)) ? ""
+							: root.substring(root.indexOf("[") + 1, root.indexOf("]")) + "--$")
+							+ xssfSheet.getRow(i + (startRowIdx - 1)).getCell(j).getRawValue() + "";
+
+				}
+			}
+		}
+		return arr;
+	}
+
+	public static CellRangeAddress getMergedRegionForCell(Cell c) {
+		Sheet s = c.getRow().getSheet();
+		for (CellRangeAddress mergedRegion : s.getMergedRegions()) {
+			if (mergedRegion.isInRange(c.getRowIndex(), c.getColumnIndex())) {
+
+				return mergedRegion;
+			}
+		}
+
+		return null;
+	}
+
+	private static int getColumnIdx(String column) {
+		char[] arr = column.toCharArray();
+		char temp = 'A';
+		int index = 0;
+		for (int i = 0; i < arr.length; i++) {
+			temp = arr[i];
+			int j = 0;
+			for (char a = 'A'; a <= 'Z'; a++) {
+				if (temp == a) {
+					index += j;
+					break;
+				}
+				j++;
+			}
+			index = j;
+		}
+		return index;
+	}
+
+	public static String[] getSplited(String tblIdx, String regex) {
+		return tblIdx.split(regex);
+	}
+
+	private static String createLeaveTable() {
+		String content = "";
+		content += jsnObj.get("oTbltg").toString();
+		content += "<tr style=\"mso-yfti-irow:0;mso-yfti-firstrow:yes;height:11.5pt\">\r\n"
+				+ "			<td width=\"1020\" nowrap=\"\" colspan=\"4\" style=\"width:764.7pt;border:solid windowtext 1.0pt;\r\n"
+				+ "  background:#FFE699;padding:0in 5.4pt 0in 5.4pt;height:11.5pt\">\r\n"
+				+ "				<p class=\"MsoNormal\" style=\"text-align:center;mso-element:frame;\r\n"
+				+ "  mso-element-frame-hspace:9.0pt;mso-element-wrap:around;mso-element-anchor-vertical:\r\n"
+				+ "  paragraph;mso-element-anchor-horizontal:column;mso-height-rule:exactly\">\r\n"
+				+ "					<b>\r\n"
+				+ "						<span style=\"font-size:10.0pt;color:black\">R2 State Rollout Leave </span>\r\n"
+				+ "					</b>\r\n" + "					<b>\r\n"
+				+ "						<span style=\"font-size:10.0pt\">Summary for 29<sup>th</sup> October<o:p/>\r\n"
+				+ "						</span>\r\n" + "					</b>\r\n" + "				</p>\r\n"
+				+ "			</td>\r\n" + "		</tr>";
+		content += " <tr style=\"mso-yfti-irow:1;height:7.5pt\">\r\n"
+				+ "			<td width=\"139\" nowrap=\"\" valign=\"bottom\" style=\"width:103.9pt;border:solid windowtext 1.0pt;\r\n"
+				+ "  border-top:none;background:#BDD7EE;padding:0in 5.4pt 0in 5.4pt;height:7.5pt\">\r\n"
+				+ "				<p class=\"MsoNormal\"  style=\"text-align:center;mso-element:frame;\r\n"
+				+ "  mso-element-frame-hspace:9.0pt;mso-element-wrap:around;mso-element-anchor-vertical:\r\n"
+				+ "  paragraph;mso-element-anchor-horizontal:column;mso-height-rule:exactly\">\r\n"
+				+ "					<b>\r\n"
+				+ "						<span style=\"font-size:10.0pt;color:black\">Total FTEs<o:p/>\r\n"
+				+ "						</span>\r\n" + "					</b>\r\n" + "				</p>\r\n"
+				+ "			</td>\r\n"
+				+ "			<td width=\"289\" nowrap=\"\" valign=\"bottom\" style=\"width:216.75pt;border-top:none;\r\n"
+				+ "  border-left:none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;\r\n"
+				+ "  background:#BDD7EE;padding:0in 5.4pt 0in 5.4pt;height:7.5pt\">\r\n"
+				+ "				<p class=\"MsoNormal\"  style=\"text-align:center;mso-element:frame;\r\n"
+				+ "  mso-element-frame-hspace:9.0pt;mso-element-wrap:around;mso-element-anchor-vertical:\r\n"
+				+ "  paragraph;mso-element-anchor-horizontal:column;mso-height-rule:exactly\">\r\n"
+				+ "					<b>\r\n"
+				+ "						<span style=\"font-size:10.0pt;color:black\">Planned Leaves<o:p/>\r\n"
+				+ "						</span>\r\n" + "					</b>\r\n" + "				</p>\r\n"
+				+ "			</td>\r\n"
+				+ "			<td width=\"265\" nowrap=\"\" valign=\"bottom\" style=\"width:198.45pt;border-top:none;\r\n"
+				+ "  border-left:none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;\r\n"
+				+ "  background:#BDD7EE;padding:0in 5.4pt 0in 5.4pt;height:7.5pt\">\r\n"
+				+ "				<p class=\"MsoNormal\"  style=\"text-align:center;mso-element:frame;\r\n"
+				+ "  mso-element-frame-hspace:9.0pt;mso-element-wrap:around;mso-element-anchor-vertical:\r\n"
+				+ "  paragraph;mso-element-anchor-horizontal:column;mso-height-rule:exactly\">\r\n"
+				+ "					<b>\r\n"
+				+ "						<span style=\"font-size:10.0pt;color:black\">Un</span>\r\n"
+				+ "					</b>\r\n" + "					<b>\r\n"
+				+ "						<span style=\"font-size:\r\n"
+				+ "  10.0pt\">p<span style=\"color:black\">lanned Leaves<o:p/>\r\n"
+				+ "							</span>\r\n" + "						</span>\r\n"
+				+ "					</b>\r\n" + "				</p>\r\n" + "			</td>\r\n"
+				+ "			<td width=\"327\" nowrap=\"\" valign=\"bottom\" style=\"width:245.6pt;border-top:none;\r\n"
+				+ "  border-left:none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;\r\n"
+				+ "  background:#BDD7EE;padding:0in 5.4pt 0in 5.4pt;height:7.5pt\">\r\n"
+				+ "				<p class=\"MsoNormal\"  style=\"text-align:center;mso-element:frame;\r\n"
+				+ "  mso-element-frame-hspace:9.0pt;mso-element-wrap:around;mso-element-anchor-vertical:\r\n"
+				+ "  paragraph;mso-element-anchor-horizontal:column;mso-height-rule:exactly\">\r\n"
+				+ "					<b>\r\n"
+				+ "						<span style=\"font-size:10.0pt;color:black\">Work from Home<o:p/>\r\n"
+				+ "						</span>\r\n" + "					</b>\r\n" + "				</p>\r\n"
+				+ "			</td>\r\n" + "		</tr>";
+		content += "<tr style=\"mso-yfti-irow:2;height:9.5pt\">\r\n"
+				+ "			<td width=\"139\" nowrap=\"\" valign=\"bottom\" style=\"width:103.9pt;border:solid windowtext 1.0pt;\r\n"
+				+ "  border-top:none;background:#BDD7EE;padding:0in 5.4pt 0in 5.4pt;height:9.5pt\">\r\n"
+				+ "				<p class=\"MsoNormal\"  style=\"text-align:center;mso-element:frame;\r\n"
+				+ "  mso-element-frame-hspace:9.0pt;mso-element-wrap:around;mso-element-anchor-vertical:\r\n"
+				+ "  paragraph;mso-element-anchor-horizontal:column;mso-height-rule:exactly\">\r\n"
+				+ "					<span style=\"font-size:10.0pt\">::84<span style=\"color:black\">\r\n"
+				+ "							<o:p/>\r\n" + "						</span>\r\n"
+				+ "					</span>\r\n" + "				</p>\r\n" + "			</td>\r\n"
+				+ "			<td width=\"289\" nowrap=\"\" valign=\"bottom\" style=\"width:216.75pt;border-top:none;\r\n"
+				+ "  border-left:none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;\r\n"
+				+ "  background:#BDD7EE;padding:0in 5.4pt 0in 5.4pt;height:9.5pt\">\r\n"
+				+ "				<p class=\"MsoNormal\"  style=\"text-align:center;mso-element:frame;\r\n"
+				+ "  mso-element-frame-hspace:9.0pt;mso-element-wrap:around;mso-element-anchor-vertical:\r\n"
+				+ "  paragraph;mso-element-anchor-horizontal:column;mso-height-rule:exactly\">\r\n"
+				+ "					<span style=\"font-size:10.0pt\">::2<span style=\"color:black\">\r\n"
+				+ "							<o:p/>\r\n" + "						</span>\r\n"
+				+ "					</span>\r\n" + "				</p>\r\n" + "			</td>\r\n"
+				+ "			<td width=\"265\" nowrap=\"\" valign=\"bottom\" style=\"width:198.45pt;border-top:none;\r\n"
+				+ "  border-left:none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;\r\n"
+				+ "  background:#BDD7EE;padding:0in 5.4pt 0in 5.4pt;height:9.5pt\">\r\n"
+				+ "				<p class=\"MsoNormal\"  style=\"text-align:center;mso-element:frame;\r\n"
+				+ "  mso-element-frame-hspace:9.0pt;mso-element-wrap:around;mso-element-anchor-vertical:\r\n"
+				+ "  paragraph;mso-element-anchor-horizontal:column;mso-height-rule:exactly\">\r\n"
+				+ "					<span style=\"font-size:10.0pt\">::1<span style=\"color:black\">\r\n"
+				+ "							<o:p/>\r\n" + "						</span>\r\n"
+				+ "					</span>\r\n" + "				</p>\r\n" + "			</td>\r\n"
+				+ "			<td width=\"327\" nowrap=\"\" valign=\"bottom\" style=\"width:245.6pt;border-top:none;\r\n"
+				+ "  border-left:none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;\r\n"
+				+ "  background:#BDD7EE;padding:0in 5.4pt 0in 5.4pt;height:9.5pt\">\r\n"
+				+ "				<p class=\"MsoNormal\" style=\"mso-element:frame;mso-element-frame-hspace:9.0pt;\r\n"
+				+ "  mso-element-wrap:around;mso-element-anchor-vertical:paragraph;mso-element-anchor-horizontal:\r\n"
+				+ "  column;mso-height-rule:exactly\">\r\n"
+				+ "					<span style=\"font-size:10.0pt\">1<span style=\"color:black\">\r\n"
+				+ "							<o:p/>\r\n" + "						</span>\r\n"
+				+ "					</span>\r\n" + "				</p>\r\n" + "			</td>\r\n" + "		</tr>";
+		content += "<tr style=\"mso-yfti-irow:3;mso-yfti-lastrow:yes;height:9.5pt\">\r\n"
+				+ "			<td width=\"139\" nowrap=\"\" valign=\"top\" style=\"width:103.9pt;border:solid windowtext 1.0pt;\r\n"
+				+ "  border-top:none;background:white;padding:0in 5.4pt 0in 5.4pt;height:9.5pt\">\r\n"
+				+ "				<p class=\"MsoNormal\" style=\"mso-element:frame;mso-element-frame-hspace:9.0pt;\r\n"
+				+ "  mso-element-wrap:around;mso-element-anchor-vertical:paragraph;mso-element-anchor-horizontal:\r\n"
+				+ "  column;mso-height-rule:exactly\">\r\n"
+				+ "					<span style=\"font-size:10.0pt\">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;\r\n"
+				+ "						<span style=\"color:black\">\r\n" + "							<o:p/>\r\n"
+				+ "						</span>\r\n" + "					</span>\r\n" + "				</p>\r\n"
+				+ "			</td>\r\n"
+				+ "			<td width=\"289\" nowrap=\"\" valign=\"top\" style=\"width:216.75pt;border-top:none;\r\n"
+				+ "  border-left:none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;\r\n"
+				+ "  background:white;padding:0in 5.4pt 0in 5.4pt;height:9.5pt\">\r\n"
+				+ "				<p class=\"MsoNormal\" style=\"margin-left:.75in;text-indent:-.25in;mso-list:l1 level1 lfo3;\r\n"
+				+ "  mso-element:frame;mso-element-frame-hspace:9.0pt;mso-element-wrap:around;\r\n"
+				+ "  mso-element-anchor-vertical:paragraph;mso-element-anchor-horizontal:column;\r\n"
+				+ "  mso-height-rule:exactly\">\r\n" + "					<!--[if !supportLists]-->\r\n"
+				+ "					<span style=\"font-size:9.0pt;\r\n"
+				+ "  mso-fareast-font-family:Calibri;mso-bidi-font-family:Calibri\">\r\n"
+				+ "						<span style=\"mso-list:Ignore\">1.<span style=\"font:7.0pt &quot;Times New Roman&quot;\">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;\r\n"
+				+ "							</span>\r\n" + "						</span>\r\n"
+				+ "					</span>\r\n" + "					<!--[endif]-->\r\n"
+				+ "					<span style=\"font-size:9.0pt;mso-fareast-font-family:\r\n"
+				+ "  &quot;Times New Roman&quot;\">Gautami Kadasani<o:p/>\r\n" + "					</span>\r\n"
+				+ "				</p>\r\n"
+				+ "				<p class=\"MsoNormal\" style=\"margin-left:.75in;text-indent:-.25in;mso-list:l1 level1 lfo3;\r\n"
+				+ "  mso-element:frame;mso-element-frame-hspace:9.0pt;mso-element-wrap:around;\r\n"
+				+ "  mso-element-anchor-vertical:paragraph;mso-element-anchor-horizontal:column;\r\n"
+				+ "  mso-height-rule:exactly\">\r\n" + "					<!--[if !supportLists]-->\r\n"
+				+ "					<span style=\"font-size:9.0pt;\r\n"
+				+ "  mso-fareast-font-family:Calibri;mso-bidi-font-family:Calibri;color:black\">\r\n"
+				+ "						<span style=\"mso-list:Ignore\">2.<span style=\"font:7.0pt &quot;Times New Roman&quot;\">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;\r\n"
+				+ "							</span>\r\n" + "						</span>\r\n"
+				+ "					</span>\r\n" + "					<!--[endif]-->\r\n"
+				+ "					<span style=\"font-size:9.0pt;mso-fareast-font-family:\r\n"
+				+ "  &quot;Times New Roman&quot;;color:black\">Prabhu Radhakrishnan<o:p/>\r\n"
+				+ "					</span>\r\n" + "				</p>\r\n"
+				+ "				<p class=\"MsoNormal\" style=\"margin-bottom:12.0pt;mso-element:frame;mso-element-frame-hspace:\r\n"
+				+ "  9.0pt;mso-element-wrap:around;mso-element-anchor-vertical:paragraph;\r\n"
+				+ "  mso-element-anchor-horizontal:column;mso-height-rule:exactly\">\r\n"
+				+ "					<o:p>&nbsp;</o:p>\r\n" + "				</p>\r\n"
+				+ "				<p class=\"MsoNormal\" style=\"mso-element:frame;mso-element-frame-hspace:9.0pt;\r\n"
+				+ "  mso-element-wrap:around;mso-element-anchor-vertical:paragraph;mso-element-anchor-horizontal:\r\n"
+				+ "  column;mso-height-rule:exactly\">\r\n" + "					<o:p>&nbsp;</o:p>\r\n"
+				+ "				</p>\r\n"
+				+ "				<p class=\"MsoNormal\" style=\"margin-left:.25in;mso-element:frame;mso-element-frame-hspace:\r\n"
+				+ "  9.0pt;mso-element-wrap:around;mso-element-anchor-vertical:paragraph;\r\n"
+				+ "  mso-element-anchor-horizontal:column;mso-height-rule:exactly\">\r\n"
+				+ "					<o:p>&nbsp;</o:p>\r\n" + "				</p>\r\n" + "			</td>\r\n"
+				+ "			<td width=\"265\" nowrap=\"\" valign=\"top\" style=\"width:198.45pt;border-top:none;\r\n"
+				+ "  border-left:none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;\r\n"
+				+ "  background:white;padding:0in 5.4pt 0in 5.4pt;height:9.5pt\">\r\n"
+				+ "				<p class=\"MsoNormal\" style=\"margin-left:.25in;mso-element:frame;mso-element-frame-hspace:\r\n"
+				+ "  9.0pt;mso-element-wrap:around;mso-element-anchor-vertical:paragraph;\r\n"
+				+ "  mso-element-anchor-horizontal:column;mso-height-rule:exactly\">\r\n"
+				+ "					<span style=\"font-size:9.0pt;color:black\">1. &nbsp;&nbsp;</span>\r\n"
+				+ "					<span style=\"font-size:9.0pt\">\r\n"
+				+ "						<span style=\"color:black\">&nbsp;</span>\r\n" + "					</span>\r\n"
+				+ "					<span style=\"font-size:9.0pt\">Suganyha Manoharan<span style=\"color:black\">\r\n"
+				+ "							<o:p/>\r\n" + "						</span>\r\n"
+				+ "					</span>\r\n" + "				</p>\r\n" + "			</td>\r\n"
+				+ "			<td width=\"327\" nowrap=\"\" valign=\"top\" style=\"width:245.6pt;border-top:none;\r\n"
+				+ "  border-left:none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;\r\n"
+				+ "  background:white;padding:0in 5.4pt 0in 5.4pt;height:9.5pt\">\r\n"
+				+ "				<p class=\"MsoNormal\" style=\"margin-left:2.0in;text-indent:-.25in;mso-list:l2 level4 lfo6;\r\n"
+				+ "  mso-element:frame;mso-element-frame-hspace:9.0pt;mso-element-wrap:around;\r\n"
+				+ "  mso-element-anchor-vertical:paragraph;mso-element-anchor-horizontal:column;\r\n"
+				+ "  mso-height-rule:exactly\">\r\n" + "					<!--[if !supportLists]-->\r\n"
+				+ "					<span style=\"font-size:9.0pt;\r\n"
+				+ "  mso-fareast-font-family:Calibri;mso-bidi-font-family:Calibri\">\r\n"
+				+ "						<span style=\"mso-list:Ignore\">1.<span style=\"font:7.0pt &quot;Times New Roman&quot;\">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;\r\n"
+				+ "							</span>\r\n" + "						</span>\r\n"
+				+ "					</span>\r\n" + "					<!--[endif]-->\r\n"
+				+ "					<span style=\"font-size:9.0pt;mso-fareast-font-family:\r\n"
+				+ "  &quot;Times New Roman&quot;\">Karuna<o:p/>\r\n" + "					</span>\r\n"
+				+ "				</p>\r\n"
+				+ "				<p class=\"MsoListParagraph\" style=\"margin-left:2.0in;mso-element:frame;\r\n"
+				+ "  mso-element-frame-hspace:9.0pt;mso-element-wrap:around;mso-element-anchor-vertical:\r\n"
+				+ "  paragraph;mso-element-anchor-horizontal:column;mso-height-rule:exactly\">\r\n"
+				+ "					<span style=\"font-size:9.0pt\">\r\n"
+				+ "						<o:p>&nbsp;</o:p>\r\n" + "					</span>\r\n"
+				+ "				</p>\r\n"
+				+ "				<p class=\"MsoNormal\" style=\"mso-element:frame;mso-element-frame-hspace:9.0pt;\r\n"
+				+ "  mso-element-wrap:around;mso-element-anchor-vertical:paragraph;mso-element-anchor-horizontal:\r\n"
+				+ "  column;mso-height-rule:exactly\">\r\n" + "					<span style=\"font-size:9.0pt\">\r\n"
+				+ "						<o:p>&nbsp;</o:p>\r\n" + "					</span>\r\n"
+				+ "				</p>\r\n"
+				+ "				<p class=\"MsoNormal\" style=\"mso-element:frame;mso-element-frame-hspace:9.0pt;\r\n"
+				+ "  mso-element-wrap:around;mso-element-anchor-vertical:paragraph;mso-element-anchor-horizontal:\r\n"
+				+ "  column;mso-height-rule:exactly\">\r\n"
+				+ "					<span style=\"font-size:9.0pt\">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;\r\n"
+				+ "						<o:p/>\r\n" + "					</span>\r\n" + "				</p>\r\n"
+				+ "			</td>\r\n" + "		</tr>";
+		content += jsnObj.get("cTbltg").toString();
+		content += "";
+
+		return content;
+	}
+
+	private static String getfooter() {
+
+		return jsnObj.get("footer").toString();
+	}
+
+	private static String getHeader() {
+
+		return (String) jsnObj.get("header");
+	}
+
+	public void convertCol2Num(String str) {
+		String[] part = str.split("(?<=\\D)(?=\\d)");
+		System.out.println(part[0]);
+		System.out.println(part[1]);
+	}
+
+	public static String Column(int column) {
+		if (column >= 0 && column < 26)
+			return ((char) ('A' + column)) + "";
+		else if (column > 25) {
+			return Column(column / 26) + Column(column % 26 + 1) + "";
+		}
+		return null;
+	}
+
+	private static void printarray() {
+		for (int i = 0; i < MergeMap.length; i++) {
+			for (int j = 0; j < MergeMap[i].length; j++) {
+				System.out.print(MergeMap[i][j] + " \t");
+			}
+			System.out.print("\n");
+		}
+		System.out.println("\n\n\n\n");
+	}
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+import java.io.*;
+import java.util.*;
+
+import javax.mail.*;
+
+import javax.mail.internet.*;
+
+
+public class MsgCreator extends ContentBuilder {
+	private Address[] fromAddress, toAddress;
+	private Session session;
+	MimeMessage msg;
+	
+
+	protected MimeMessage generateMessage() throws Exception {
+		msg = setup();
+		MimeBodyPart textPart = new MimeBodyPart();
+		textPart.setText("Body's text (text)", "UTF-8");
+		MimeBodyPart htmlPart = new MimeBodyPart();
+		htmlPart.setContent(getConsolidatedContent(), "text/html; charset=UTF-8");
+		Multipart multiPart = new MimeMultipart("alternative");
+		multiPart.addBodyPart(textPart); // first
+		multiPart.addBodyPart(htmlPart); // second
+		msg.setContent(multiPart);
+		msg.addHeader("X-Custom-Header", "CustomValue");
+		return msg;
+	}
+
+	
+	protected MimeMessage setup() throws AddressException, MessagingException {
+		Properties properties = new Properties();
+		properties.put("mail.files.path", "");
+		session = Session.getDefaultInstance(properties);
+		fromAddress = new Address[] { new InternetAddress("abc@test.com") };
+		toAddress = new Address[] { new InternetAddress("vaidyanath.prabhakar@capgemini.com") };
+		msg = new MimeMessage(session);
+		msg.addFrom(fromAddress);
+		msg.setReplyTo(toAddress);
+		msg.setSubject("subject");
+		return msg;
+	}
+	
+	protected static void println(String string) {
+		System.out.println(string);
+	}
+	
+	protected InputStream getPropertiesFile() {
+		return newConsolidator.class.getClassLoader().getResourceAsStream("config.properties");
+	}
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#Productivity Consolidator config.properties
+
+filedir=C:\\excelFiles\\
+outputdir=C:\\Output\\
+filename=consolidate.eml
+setting=settings.json
+
+#B A Productivity
+tblind1=A2:G24
+pageIndex1=Summary
+
+#agency Portal Productivity
+tblind2=A2:G24
+pageIndex2=Day Summary
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+{
+	"Name-1": "B A productivity",
+	"tblind-1": "A2:G24",
+	"summaryPgName-1":"Summary",
+	
+	
+	"Name-2": "Agency Portal productivity",
+	"tblind-2": "A2:G9",
+	"summaryPgName-2":"Day Summary",
+	
+	
+	"Name-3": "Comprater productivity",
+	"tblind-3": "A2:G9",
+	"summaryPgName-3":"Day Summary",
+	
+	
+	"Name-4": "GW Config productivity",
+	"tblind-4": "A2:G10",
+	"summaryPgName-4":"Summary",
+	
+	
+	"Name-5": "GW Integ productivity",
+	"tblind-5": "A2:G9",
+	"summaryPgName-5":"Summary",
+	
+	
+	"Name-6": "Forms productivity",
+	"tblind-6": "A2:G11",
+	"summaryPgName-6":"Summary",
+	
+	
+	"Name-7": "PERS productivity",
+	"tblind-7": "A2:G13",
+	"summaryPgName-7":"Summary",
+	
+	"Name-8": "QA productivity",
+	"tblind-8": "A2:S10",
+	"summaryPgName-8":"Summary",
+	
+	"nxln": "<p class=MsoNormal><o:p>&nbsp;</o:p></p>",
+	"footer": "</div></body></html>",
+	"header": "<html><head><meta http-equiv=Content-Type content=\"text/html; charset=windows-1252\"><meta name=ProgId content=Word.Document><meta name=Generator content=\"Microsoft Word 15\"><meta name=Originator content=\"Microsoft Word 15\"></head> <body lang=EN-US link=\"#0563C1\" vlink=\"#954F72\" style=\"tab-interval:.5in; font-family: Calibri;\">  <div class=WordSection1>     <p class=MsoNormal>      <span style='color:#002060'>Please find daily productivity report for K2 streams and the overall summary.</span>  </p>",
+	"oTbltg": "<table class=\"MsoNormalTable\" border=\"0\" cellspacing=\"0\" cellpadding=\"0\" align=\"left\" width=\"1020\" style=\"width:764.7pt;border-collapse:collapse;mso-yfti-tbllook: 1184;mso-table-lspace:9.0pt;margin-left:6.75pt;mso-table-rspace:9.0pt; margin-right:6.75pt;mso-table-anchor-vertical:paragraph;mso-table-anchor-horizontal:column;mso-table-left:left;mso-padding-alt:0in 0in 0in 0in\"><tbody>",
+	"cTbltg": "</tbody></table>"
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
